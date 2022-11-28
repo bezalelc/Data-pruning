@@ -1,5 +1,7 @@
 import torch
 import pytest
+from torch import tensor
+
 import code.src.prune.el2n as el2n
 
 
@@ -9,18 +11,21 @@ def dataset():
 
 
 def test_get_el2n_scores(dataset):
-    X, Y = dataset
+    from torch import tensor
 
-    X_mean = torch.tensor([[6., 7., 8., 9.],
-                           [10., 11., 12., 13.],
-                           [14., 15., 16., 17.]], dtype=torch.float64)
-    res = X_mean.detach()
-    res[0, Y[0]] -= 1
-    res[1, Y[1]] -= 1
-    res[2, Y[2]] -= 1
-
-    res = torch.sum(res * res, dim=1) ** 0.5
-    el2n_scores = el2n.get_el2n_scores(Y, X)
+    ensemble_softmax = tensor([
+        [[1, 0]],
+        [[0, 1]]
+    ], dtype=torch.float64)
+    num_ensemble, num_train, num_classes = ensemble_softmax.shape
+    Y_train = tensor([0])
+    y_one_hot_ = tensor([[1, 0]])
+    expected = (y_one_hot_ - ensemble_softmax) ** 2
+    expected = tensor([(expected[0][0][0] + expected[0][0][1]) ** .5,
+                       (expected[1][0][0] + expected[1][0][1]) ** .5])
+    expected = (expected[0] + expected[1]) / num_ensemble
+    el2n_scores = el2n.get_el2n_scores(Y_train, ensemble_softmax)
+    assert expected == el2n_scores
 
 
 def test_get_prune_idx(dataset):

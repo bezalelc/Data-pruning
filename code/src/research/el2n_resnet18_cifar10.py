@@ -7,19 +7,19 @@ import torch
 import torch.nn.functional as F
 import torchvision.utils
 from torch import nn, optim, tensor
-# from torch.utils.data.sampler import SubsetRandomSampler
-from torchvision import models, transforms
-
+from torchvision import models
 
 from code.src.prune.el2n import get_prune_idx, get_el2n_scores
 from code.src.utils.dataset import get_cifar10
 
 NUM_CLASSES = 10
 BATCH_SIZE = 5
-NUM_TRAIN = 15
-NUM_VALID = 10
+NUM_TRAIN = 50
+NUM_VALID = 5
 NUM_TEST = 5
-EPOCHS = 3
+EPOCHS = 2
+ENSEMBLE_SIZE = 3
+PATH_MODELS_SAVE = r'/home/bb/Documents/proj/Data-pruning/models_data/el2n_resnet18_cifar10'
 
 # check if CUDA is available
 TRAIN_ON_GPU = torch.cuda.is_available()
@@ -54,12 +54,12 @@ def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, 
           verbose: bool = True):
     loss_train, loss_valid, loss_valid_min, acc_train, acc_valid = [], [], np.Inf, [], []
     scores_train, scores_valid, scores_test = None, None, None
-    len_train, len_valid, len_test = len(train_loader.dataset), len(valid_loader.dataset), len(test_loader.dataset)
+
     for epoch in range(epochs):
         scores_train, loss, acc = run_epoch(model, criterion, optimizer, train_loader, Mode.TRAIN)
-        loss_train.append(loss / len_train), acc_train.append(acc / len_train)
+        loss_train.append(loss), acc_train.append(acc)
         scores_valid, loss, acc_test = run_epoch(model, criterion, optimizer, valid_loader, Mode.VALIDATE)
-        loss_valid.append(loss / len_valid), acc_valid.append(acc / len_valid)
+        loss_valid.append(loss), acc_valid.append(acc)
 
         # print training/validation statistics
         if verbose:
@@ -76,8 +76,8 @@ def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, 
 
     scores_test, loss_test, acc_test = run_epoch(model, criterion, optimizer, test_loader, Mode.TEST)
     if verbose:
-        print(f'Test Loss: {loss_test / len_test:.6f}')
-        print(f'Accuracy: {acc_test / len_test}')
+        print(f'Test Loss: {loss_test:.6f}')
+        print(f'Accuracy: {acc_test}')
 
     return (scores_train, loss_train, acc_train), (scores_valid, loss_valid, acc_valid), \
            (scores_test, loss_test, acc_test)
@@ -87,6 +87,7 @@ def run_epoch(model, criterion, optimizer, loader, mode: Mode = Mode.TRAIN):
     model.train() if mode == Mode.TRAIN else model.eval()
 
     loss, loss_min, acc = .0, np.Inf, .0
+    len_dataset = len(loader.dataset)
     scores = torch.empty((len(loader.dataset), NUM_CLASSES))
 
     for batch_idx, (X, y) in enumerate(loader):
@@ -102,12 +103,14 @@ def run_epoch(model, criterion, optimizer, loader, mode: Mode = Mode.TRAIN):
         if mode == Mode.TRAIN:
             loss_batch.backward()
             optimizer.step()
+        else:
+            scores[batch_idx * BATCH_SIZE:(batch_idx + 1) * BATCH_SIZE] = p.clone().detach()
 
-        scores[batch_idx * BATCH_SIZE:(batch_idx + 1) * BATCH_SIZE] = p.clone().detach()
         _, pred = torch.max(p, 1)
-        acc += torch.sum(pred.eq(y.data.view_as(pred)))
+        # print(batch_idx, y, pred, pred.eq(y), torch.sum(pred.eq(y)), torch.sum(pred.eq(y)) / 30)
+        acc += torch.sum(pred.eq(y))
 
-    return scores, loss, acc
+    return scores, loss / len_dataset, acc / len_dataset
 
 
 def main():
@@ -126,20 +129,22 @@ def main():
     loader_valid = get_loader(data_train, np.arange(NUM_TRAIN, NUM_VALID + NUM_TRAIN))
     loader_test = get_loader(data_test, np.arange(NUM_TEST))
 
-    ensemble = [get_model() for _ in range(2)]
+    ensemble = [get_model() for _ in range(ENSEMBLE_SIZE)]
     prune_size = .5
-    ensemble_softmax = torch.empty((len(ensemble), NUM_TRAIN, NUM_CLASSES))
-    ensemble_pred = torch.empty((len(ensemble), NUM_TRAIN), dtype=torch.int8)
+    ensemble_softmax = torch.empty((len(ensemble), NUM_TRAIN, NUM_CLASSES), device=DEVICE)
+    ensemble_pred = torch.empty((NUM_TRAIN, len(ensemble)), dtype=torch.bool, device=DEVICE)
+    ensemble_pred_sum = torch.empty((NUM_TRAIN,), dtype=torch.int8, device=DEVICE)
     idx = np.arange(NUM_TRAIN)
     # create loader with no shuffling
     loader_prune = get_loader(data_train, idx, shuffle=False)
-    Y_train = tensor(data_train.targets)[idx]
+    Y_train = tensor(data_train.targets, device=DEVICE)[idx]
 
     for i, (model, criterion, optimizer) in enumerate(ensemble):
         print(f'------------   model {i}   -------------------')
+        path = os.path.join(PATH_MODELS_SAVE, f'resnet18_{i}')
         (scores_train, loss_train, acc_train), (scores_valid, loss_valid, acc_valid), (
             scores_test, loss_test, acc_test) = \
-            train(model, loader_train, loader_valid, loader_test, criterion, optimizer, 2, verbose=True)
+            train(model, loader_train, loader_valid, loader_test, criterion, optimizer, 4, verbose=True, save_path=path)
 
         model.eval()
         for batch_idx, (X, y) in enumerate(loader_prune):
@@ -148,10 +153,21 @@ def main():
             pred = model(X)
             idx = np.arange(batch_idx * BATCH_SIZE, (batch_idx + 1) * BATCH_SIZE)
             ensemble_softmax[i, idx] = F.softmax(pred, dim=1)
-            ensemble_pred[i, idx] = torch.max(pred, 1)[1].type(ensemble_pred.dtype)
+            ensemble_pred[idx, i] = torch.max(pred, 1)[1].type(torch.int8) == y
+
+    ensemble_pred_sum = torch.sum(ensemble_pred, dim=1)
+    print(ensemble_pred.sum(dim=0))
+
+    # save data
+    torch.save(ensemble_pred_sum, os.path.join(PATH_MODELS_SAVE, 'ensemble_pred_sum.pt'))
+    torch.save(ensemble_pred, os.path.join(PATH_MODELS_SAVE, 'ensemble_pred.pt'))
+    torch.save(ensemble_softmax, os.path.join(PATH_MODELS_SAVE, 'ensemble_softmax.pt'))
+
+    plt.style.use('ggplot')
+    plt.hist(ensemble_pred_sum, bins=len(ensemble), facecolor='g', alpha=0.6)
+    plt.show()
 
     el2n_scores = get_el2n_scores(Y_train, ensemble_softmax).detach().numpy()
-    plt.style.use('ggplot')
     plt.hist(el2n_scores, bins=len(data_train.classes), facecolor='g', alpha=0.6)
     plt.show()
 
@@ -175,8 +191,6 @@ def main():
         ax.set_title(f'EL2N {el2n_scores[i]:.3f}, Class: {data_train_raw.classes[data_train_raw[i][1]]}')
     plt.show()
 
-    M = ensemble_pred.clone().detach().to('cpu')
-
     idx_to_keep = get_prune_idx(Y_train, ensemble_softmax, prune_size)
 
     loader_train = get_loader(data_train, idx_to_keep, True)
@@ -188,16 +202,16 @@ def main():
         scores_valid_p, loss_valid_p, acc_valid_p), (
         scores_test_p, loss_test_p, acc_test_p) = \
         train(model_prune, loader_prune, loader_valid, loader_test, criterion_prune, optimizer_prune, EPOCHS,
-              verbose=True)
+              verbose=True, save_path=os.path.join(PATH_MODELS_SAVE, 'resnet18_prune'))
 
     # train model without prune
     (scores_train, loss_train, acc_train), (scores_valid, loss_valid, acc_valid), (
         scores_test, loss_test, acc_test) = \
         train(model_simple, loader_train, loader_valid, loader_test, criterion_simple, optimizer_simple, EPOCHS,
-              verbose=True)
+              verbose=True, save_path=os.path.join(PATH_MODELS_SAVE, 'resnet18_no_prune'))
 
-    torch.save(model_prune.state_dict(), './model_prune.pt')
-    torch.save(model_simple.state_dict(), './model_simple.pt')
+    # torch.save(model_prune.state_dict(), './model_prune.pt')
+    # torch.save(model_simple.state_dict(), './model_simple.pt')
     # load: model.load_state_dict(torch.load(PATH))
 
     fig, (ax_train_loss, ax_valid_loss) = plt.subplots(1, 2)

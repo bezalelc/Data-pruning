@@ -32,6 +32,3 @@ def get_el2n_scores_(y, ensemble_pred):
 
 def get_prune_idx(y, ensemble_pred, prune_size: float, keep_hardest: bool = True):
     return get_el2n_scores(y, ensemble_pred).argsort(descending=keep_hardest)[:int(prune_size * y.shape[0])]
-
-
-
