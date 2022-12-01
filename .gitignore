@@ -17,4 +17,5 @@ progress
 temp/
 
 # python temp
-
+code/main.py
+code/src/utils/plot.py
