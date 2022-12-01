@@ -11,6 +11,7 @@ from torchvision import models
 
 from code.src.prune.el2n import get_prune_idx, get_el2n_scores
 from code.src.utils.dataset import get_cifar10
+from code.src.utils.train import Mode, run_epoch
 
 NUM_CLASSES = 10
 BATCH_SIZE = 5
@@ -19,17 +20,12 @@ NUM_VALID = 5
 NUM_TEST = 5
 EPOCHS = 2
 ENSEMBLE_SIZE = 3
-PATH_MODELS_SAVE = r'/home/bb/Documents/proj/Data-pruning/models_data/el2n_resnet18_cifar10'
-
+# PATH_MODELS_SAVE = r'/home/bb/Documents/Data-pruning/models_data/el2n_resnet18_cifar10'
+dir_, f = os.path.split(__file__)
+PATH_MODELS_SAVE = os.path.abspath(os.path.join(dir_, '../../../', 'models_data', f.split('.')[0]))
 # check if CUDA is available
 TRAIN_ON_GPU = torch.cuda.is_available()
 DEVICE = 'cuda' if TRAIN_ON_GPU else 'cpu'
-
-
-class Mode(Enum):
-    TRAIN = 0
-    VALIDATE = 1
-    TEST = 2
 
 
 def get_loader(dataset, idx, shuffle=True):
@@ -56,9 +52,11 @@ def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, 
     scores_train, scores_valid, scores_test = None, None, None
 
     for epoch in range(epochs):
-        scores_train, loss, acc = run_epoch(model, criterion, optimizer, train_loader, Mode.TRAIN)
+        scores_train, pred_train, loss, acc = run_epoch(model, criterion, optimizer, train_loader, NUM_CLASSES,
+                                                        Mode.TRAIN, TRAIN_ON_GPU)
         loss_train.append(loss), acc_train.append(acc)
-        scores_valid, loss, acc_test = run_epoch(model, criterion, optimizer, valid_loader, Mode.VALIDATE)
+        scores_valid, pred_valid, loss, acc_test = run_epoch(model, criterion, optimizer, valid_loader, NUM_CLASSES,
+                                                             Mode.VALIDATE, TRAIN_ON_GPU)
         loss_valid.append(loss), acc_valid.append(acc)
 
         # print training/validation statistics
@@ -74,43 +72,14 @@ def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, 
             torch.save(model.state_dict(), save_path)
             loss_valid_min = loss_valid[-1]
 
-    scores_test, loss_test, acc_test = run_epoch(model, criterion, optimizer, test_loader, Mode.TEST)
+    scores_test, pred_test, loss_test, acc_test = run_epoch(model, criterion, optimizer, test_loader, NUM_CLASSES,
+                                                            Mode.TEST, TRAIN_ON_GPU)
     if verbose:
         print(f'Test Loss: {loss_test:.6f}')
         print(f'Accuracy: {acc_test}')
 
     return (scores_train, loss_train, acc_train), (scores_valid, loss_valid, acc_valid), \
            (scores_test, loss_test, acc_test)
-
-
-def run_epoch(model, criterion, optimizer, loader, mode: Mode = Mode.TRAIN):
-    model.train() if mode == Mode.TRAIN else model.eval()
-
-    loss, loss_min, acc = .0, np.Inf, .0
-    len_dataset = len(loader.dataset)
-    scores = torch.empty((len(loader.dataset), NUM_CLASSES))
-
-    for batch_idx, (X, y) in enumerate(loader):
-        if TRAIN_ON_GPU:
-            X, y = X.cuda(), y.cuda()
-        if mode == Mode.TRAIN:
-            optimizer.zero_grad()
-
-        p = model(X)
-        loss_batch = criterion(p, y)
-        loss += loss_batch.item()
-
-        if mode == Mode.TRAIN:
-            loss_batch.backward()
-            optimizer.step()
-        else:
-            scores[batch_idx * BATCH_SIZE:(batch_idx + 1) * BATCH_SIZE] = p.clone().detach()
-
-        _, pred = torch.max(p, 1)
-        # print(batch_idx, y, pred, pred.eq(y), torch.sum(pred.eq(y)), torch.sum(pred.eq(y)) / 30)
-        acc += torch.sum(pred.eq(y))
-
-    return scores, loss / len_dataset, acc / len_dataset
 
 
 def main():
@@ -156,12 +125,13 @@ def main():
             ensemble_pred[idx, i] = torch.max(pred, 1)[1].type(torch.int8) == y
 
     ensemble_pred_sum = torch.sum(ensemble_pred, dim=1)
-    print(ensemble_pred.sum(dim=0))
+    ensemble_var = ensemble_softmax.var(dim=0)
 
     # save data
     torch.save(ensemble_pred_sum, os.path.join(PATH_MODELS_SAVE, 'ensemble_pred_sum.pt'))
     torch.save(ensemble_pred, os.path.join(PATH_MODELS_SAVE, 'ensemble_pred.pt'))
     torch.save(ensemble_softmax, os.path.join(PATH_MODELS_SAVE, 'ensemble_softmax.pt'))
+    torch.save(ensemble_var, os.path.join(PATH_MODELS_SAVE, 'ensemble_var.pt'))
 
     plt.style.use('ggplot')
     plt.hist(ensemble_pred_sum, bins=len(ensemble), facecolor='g', alpha=0.6)
