@@ -1,13 +1,11 @@
 import os
-
 import matplotlib.pyplot as plt
+
 import numpy as np
 import torch
-import torch.nn.functional as F
-from torch import nn, optim, tensor
+from torch import nn, optim
 from torchvision import models
 
-from code.src.prune.el2n import get_el2n_scores
 from code.src.utils.dataset import get_cifar10
 from code.src.utils.train import Mode, run_epoch
 
@@ -66,12 +64,19 @@ def main():
         print(f'------------   epoch {i}   -------------------')
         scores, pred, loss, acc = run_epoch(model, criterion, optimizer, loader_train, NUM_CLASSES, Mode.TRAIN,
                                             TRAIN_ON_GPU)
+        print(f'Epoch: {i} Training: Loss: {loss:.6f} Acc: {acc:.6f}')
         epochs_pred[i] = pred
 
     change_counter = torch.zeros(NUM_TRAIN, device=DEVICE, dtype=torch.int8)
     for p1, p2 in zip(epochs_pred[:-1], epochs_pred[1:]):
         change_counter += p1 != p2
-    print(change_counter)
+
+    os.makedirs(PATH_MODELS_SAVE, exist_ok=True)
+    torch.save(epochs_pred, os.path.join(PATH_MODELS_SAVE, 'epochs_pred.pt'))
+    torch.save(change_counter, os.path.join(PATH_MODELS_SAVE, 'change_counter.pt'))
+
+    plt.hist(change_counter, bins=EPOCHS - 1, facecolor='g', alpha=0.6)
+    plt.show()
 
 
 if __name__ == '__main__':

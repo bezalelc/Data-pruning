@@ -1,5 +1,4 @@
 import os
-from enum import Enum
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -128,6 +127,7 @@ def main():
     ensemble_var = ensemble_softmax.var(dim=0)
 
     # save data
+    os.makedirs(PATH_MODELS_SAVE, exist_ok=True)
     torch.save(ensemble_pred_sum, os.path.join(PATH_MODELS_SAVE, 'ensemble_pred_sum.pt'))
     torch.save(ensemble_pred, os.path.join(PATH_MODELS_SAVE, 'ensemble_pred.pt'))
     torch.save(ensemble_softmax, os.path.join(PATH_MODELS_SAVE, 'ensemble_softmax.pt'))
