@@ -9,8 +9,9 @@ class Mode(Enum):
     TEST = 2
 
 
-def run_epoch(model, criterion, optimizer, loader, num_classes, mode: Mode = Mode.TRAIN, gpu: bool = False):
+def run_epoch(model, criterion, optimizer, loader, num_classes, device, mode: Mode = Mode.TRAIN):
     model.train() if mode == Mode.TRAIN else model.eval()
+    model.to(device)
 
     loss, loss_min, acc = .0, np.Inf, .0
     len_dataset = len(loader.dataset)
@@ -18,8 +19,7 @@ def run_epoch(model, criterion, optimizer, loader, num_classes, mode: Mode = Mod
     pred = torch.empty((len(loader.dataset),))
 
     for batch_idx, (X, y) in enumerate(loader):
-        if gpu:
-            X, y = X.cuda(), y.cuda()
+        X, y = X.to(device), y.to(device)
         if mode == Mode.TRAIN:
             optimizer.zero_grad()
 

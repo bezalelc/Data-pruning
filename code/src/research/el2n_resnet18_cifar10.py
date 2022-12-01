@@ -19,12 +19,12 @@ NUM_VALID = 5
 NUM_TEST = 5
 EPOCHS = 2
 ENSEMBLE_SIZE = 3
-# PATH_MODELS_SAVE = r'/home/bb/Documents/Data-pruning/models_data/el2n_resnet18_cifar10'
+
 dir_, f = os.path.split(__file__)
 PATH_MODELS_SAVE = os.path.abspath(os.path.join(dir_, '../../../', 'models_data', f.split('.')[0]))
 # check if CUDA is available
 TRAIN_ON_GPU = torch.cuda.is_available()
-DEVICE = 'cuda' if TRAIN_ON_GPU else 'cpu'
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def get_loader(dataset, idx, shuffle=True):
@@ -52,10 +52,10 @@ def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, 
 
     for epoch in range(epochs):
         scores_train, pred_train, loss, acc = run_epoch(model, criterion, optimizer, train_loader, NUM_CLASSES,
-                                                        Mode.TRAIN, TRAIN_ON_GPU)
+                                                        DEVICE, Mode.TEST)
         loss_train.append(loss), acc_train.append(acc)
         scores_valid, pred_valid, loss, acc_test = run_epoch(model, criterion, optimizer, valid_loader, NUM_CLASSES,
-                                                             Mode.VALIDATE, TRAIN_ON_GPU)
+                                                             DEVICE, Mode.TEST)
         loss_valid.append(loss), acc_valid.append(acc)
 
         # print training/validation statistics
@@ -72,7 +72,7 @@ def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, 
             loss_valid_min = loss_valid[-1]
 
     scores_test, pred_test, loss_test, acc_test = run_epoch(model, criterion, optimizer, test_loader, NUM_CLASSES,
-                                                            Mode.TEST, TRAIN_ON_GPU)
+                                                            DEVICE, Mode.TEST)
     if verbose:
         print(f'Test Loss: {loss_test:.6f}')
         print(f'Accuracy: {acc_test}')
@@ -85,7 +85,7 @@ def main():
     if DEVICE == 'cuda':
         print('CUDA is available!  Training on  GPU...')
     else:
-        print(f'CUDA is not available.  Training on {DEVICE.upper()}...')
+        print(f'CUDA is not available.  Training on {str(DEVICE).upper()}...')
 
     torch.manual_seed(5)
 
@@ -116,8 +116,7 @@ def main():
 
         model.eval()
         for batch_idx, (X, y) in enumerate(loader_prune):
-            if TRAIN_ON_GPU:
-                X, y = X.cuda(), y.cuda()
+            X, y = X.to(DEVICE), y.to(DEVICE)
             pred = model(X)
             idx = np.arange(batch_idx * BATCH_SIZE, (batch_idx + 1) * BATCH_SIZE)
             ensemble_softmax[i, idx] = F.softmax(pred, dim=1)
@@ -134,10 +133,10 @@ def main():
     torch.save(ensemble_var, os.path.join(PATH_MODELS_SAVE, 'ensemble_var.pt'))
 
     plt.style.use('ggplot')
-    plt.hist(ensemble_pred_sum, bins=len(ensemble), facecolor='g', alpha=0.6)
+    plt.hist(ensemble_pred_sum.cpu(), bins=len(ensemble), facecolor='g', alpha=0.6)
     plt.show()
 
-    el2n_scores = get_el2n_scores(Y_train, ensemble_softmax).detach().numpy()
+    el2n_scores = get_el2n_scores(Y_train, ensemble_softmax).cpu().detach().numpy()
     plt.hist(el2n_scores, bins=len(data_train.classes), facecolor='g', alpha=0.6)
     plt.show()
 
