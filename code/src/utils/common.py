@@ -1,16 +1,33 @@
 import os
+from typing import Callable
 
 import torch
-from torchvision import models
 from torch import nn, optim
+from torchvision import models
 
 
-def get_loader(dataset, idx,batch_size, shuffle=True):
+def get_loader(dataset, idx, batch_size: int, shuffle: bool = True) -> torch.utils.data.DataLoader:
+    """
+    get data loader according to indexes
+
+    Args:
+        dataset:
+        idx:
+        batch_size:
+        shuffle:
+
+    Returns: torch.utils.data.DataLoader
+
+    """
     subset = torch.utils.data.Subset(dataset, idx)
     return torch.utils.data.DataLoader(subset, batch_size=batch_size, shuffle=shuffle)
 
 
-def get_model_resnet18_cifar10():
+def get_model_resnet18_cifar10() -> tuple:
+    """
+
+    Returns:
+    """
     model = models.resnet18(weights=None)  # ,pretrained=False
     model.fc = nn.Linear(model.fc.in_features, 10)
     # model.to(DEVICE)
@@ -23,12 +40,27 @@ def get_model_resnet18_cifar10():
     return model, criterion, optimizer
 
 
-def create_saved_data_dir(file):
-    dir_, f = os.path.split(file)
-    return os.path.abspath(os.path.join(dir_, '../../../', 'models_data', f.split('.')[0]))
+def create_saved_data_dir(file: str) -> Callable[[str], str]:
+    """
+    create the path ../../../models_data/f if not exist and return function for get the relative path for saved data
 
-def get_device():
-    device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    Args:
+        file: file to save data in ../../../models_data/f
+
+    Returns: function to generate path to file according to relative path to given file
+    """
+    dir_, f_ = os.path.split(file)
+    path_to_save = os.path.abspath(os.path.join(dir_, '../../../', 'models_data', f_.split('.')[0]))
+    os.makedirs(path_to_save, exist_ok=True)
+    return lambda f: os.path.join(path_to_save, f)
+
+
+def get_device() -> torch.device:
+    """
+    get device for pytorch: CPU or CUDA
+    Returns: device
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if str(device) == 'cuda':
         print('CUDA is available!  Training on  GPU...')
     else:

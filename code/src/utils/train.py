@@ -1,4 +1,5 @@
 from enum import Enum
+
 import numpy as np
 import torch
 
@@ -40,7 +41,9 @@ def run_epoch(model, criterion, optimizer, loader, num_classes, device, mode: Mo
 
     return scores, pred, loss / len_dataset, acc / len_dataset
 
-def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, epochs: int,num_classes, device, save_path='',
+
+def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, epochs: int, num_classes, device,
+          save_path='',
           verbose: bool = True):
     loss_train, loss_valid, loss_valid_min, acc_train, acc_valid = [], [], np.Inf, [], []
     scores_train, scores_valid, pred_train, pred_valid = None, None, None, None
@@ -74,4 +77,3 @@ def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, 
 
     return (scores_train, pred_train, loss_train, acc_train), (scores_valid, pred_valid, loss_valid, acc_valid), \
            (scores_test, pred_test, loss_test, acc_test)
-

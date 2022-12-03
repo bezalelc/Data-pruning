@@ -2,7 +2,7 @@ import torch
 from torch import tensor
 
 
-def get_el2n_scores(y:tensor, ensemble_pred:tensor):
+def get_el2n_scores(y: tensor, ensemble_pred: tensor):
     """
     calculate mean on the L2 over ensemble of algorithms
 
@@ -16,7 +16,7 @@ def get_el2n_scores(y:tensor, ensemble_pred:tensor):
     return torch.mean(torch.linalg.norm(y_one_hot - ensemble_pred, ord=2, dim=2), dim=0)
 
 
-def get_el2n_scores_(y:tensor, ensemble_pred:tensor):
+def get_el2n_scores_(y: tensor, ensemble_pred: tensor):
     """
     calculate L2(mean on the scores) over ensemble of algorithms
 
@@ -31,5 +31,5 @@ def get_el2n_scores_(y:tensor, ensemble_pred:tensor):
     return torch.linalg.norm(y_ - mean_ensemble_pred, 2, 1)
 
 
-def get_prune_idx(y:tensor, ensemble_pred:tensor, prune_size: float, keep_hardest: bool = True):
+def get_prune_idx(y: tensor, ensemble_pred: tensor, prune_size: float, keep_hardest: bool = True):
     return get_el2n_scores(y, ensemble_pred).argsort(descending=keep_hardest)[:int(prune_size * y.shape[0])]
