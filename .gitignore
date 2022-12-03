@@ -1,0 +1,24 @@
+# pycharm
+*.idea/
+*__pycache__/
+
+# lacal saved
+datasets/*
+models_data/*
+*.pt
+
+# project 
+articles/
+zoom/
+reports/
+progress
+
+# temp
+temp/
+
+# python temp
+code/main.py
+code/src/utils/plot.py
+
+# interpeter
+venv/
