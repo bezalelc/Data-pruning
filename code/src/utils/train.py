@@ -2,6 +2,7 @@ from enum import Enum
 
 import numpy as np
 import torch
+from torch import nn
 
 
 class Mode(Enum):
@@ -42,9 +43,9 @@ def run_epoch(model, criterion, optimizer, loader, num_classes, device, mode: Mo
     return scores, pred, loss / len_dataset, acc / len_dataset
 
 
-def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, epochs: int, num_classes, device,
-          save_path='',
-          verbose: bool = True):
+def train(model: nn.Module, train_loader: torch.utils.data.dataloader.DataLoader, valid_loader, test_loader, criterion,
+          optimizer: torch.optim.Optimizer, scheduler, epochs: int,
+          num_classes: int, device: torch.device, save_path='', verbose: bool = True):
     loss_train, loss_valid, loss_valid_min, acc_train, acc_valid = [], [], np.Inf, [], []
     scores_train, scores_valid, pred_train, pred_valid = None, None, None, None
 
@@ -55,6 +56,7 @@ def train(model, train_loader, valid_loader, test_loader, criterion, optimizer, 
         scores_valid, pred_valid, loss, acc = run_epoch(model, criterion, optimizer, valid_loader, num_classes,
                                                         device, Mode.VALIDATE)
         loss_valid.append(loss), acc_valid.append(acc)
+        scheduler.step()
 
         # print training/validation statistics
         if verbose:

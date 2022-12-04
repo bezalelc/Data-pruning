@@ -25,13 +25,13 @@ torch.manual_seed(5)
 def main():
     # get data
     # classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-    data_train, data_test = get_cifar10()
+    data_train, data_test = get_cifar10(os.path.abspath(os.path.join('../../../', 'datasets')))
     loader_train = get_loader(data_train, np.arange(NUM_TRAIN), BATCH_SIZE)
     loader_train_ordered = get_loader(data_train, np.arange(NUM_TRAIN), BATCH_SIZE, shuffle=False)
     loader_valid = get_loader(data_train, np.arange(NUM_TRAIN, NUM_VALID + NUM_TRAIN), BATCH_SIZE)
     loader_test = get_loader(data_test, np.arange(NUM_TEST), BATCH_SIZE)
 
-    model, criterion, optimizer = get_model_resnet18_cifar10()
+    model, criterion, optimizer, scheduler = get_model_resnet18_cifar10()
     epochs_pred = torch.empty((EPOCHS, NUM_TRAIN), dtype=torch.int8)
     change_counter = torch.zeros(NUM_TRAIN, dtype=torch.int8)
 
@@ -39,6 +39,7 @@ def main():
     for epoch in range(EPOCHS):
         train_res = run_epoch(model, criterion, optimizer, loader_train, NUM_CLASSES, DEVICE, Mode.TRAIN)
         valid_res = run_epoch(model, criterion, optimizer, loader_valid, NUM_CLASSES, DEVICE, Mode.VALIDATE)
+        scheduler.step()
         scores_train, pred_train, loss_train, acc_train = train_res
         scores_valid, pred_valid, loss_valid, acc_valid = valid_res
         print(f'Epoch: {epoch} Training: Loss: {loss_train:.6f} Acc: {acc_train:.6f}  '
@@ -64,7 +65,6 @@ def main():
 
     data_train_raw = torchvision.datasets.CIFAR10(os.path.abspath(r'../../../datasets'), train=True)
     plot_prune_example(data_train_raw, change_counter, hardest=True, random=False, prune_method_name='Forgetting')
-    return
     plot_prune_example(data_train_raw, change_counter, hardest=False, random=False, prune_method_name='Forgetting')
 
     _, idx_to_keep = change_counter.sort(descending=True)[:int(len(change_counter * .5))]
