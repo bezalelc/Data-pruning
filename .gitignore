@@ -6,6 +6,7 @@
 datasets/*
 models_data/*
 *.pt
+*.pkl
 
 # project 
 articles/
