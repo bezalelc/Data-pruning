@@ -5,6 +5,7 @@
 # lacal saved
 datasets/*
 models_data/*
+tensorboard_log/*
 *.pt
 *.pkl
 
@@ -16,6 +17,9 @@ progress
 
 # temp
 temp/
+code/t.py
+code/src/research/temp.ipynb
+code/src/research/PyTorch_CIFAR10_TB.ipynb
 
 # python temp
 code/main.py
