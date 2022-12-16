@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from typing import Sequence,Union
 
 
 def plot_prune_example(images_loader: torch.utils.data.DataLoader,
@@ -35,6 +36,7 @@ def plot_prune_example(images_loader: torch.utils.data.DataLoader,
         ax.imshow(images_loader[i][0])
         ax.set_title(f"{prune_method_name + ' '}{data_scores[i]:.3f}, "
                      f"Class: {images_loader.classes[images_loader[i][1]]}")
+        # ax.set_facecolor('xkcd:salmon')
     plt.show()
 
 
@@ -65,5 +67,37 @@ def compare_models_losses(loss_train: list[float], loss_train_prune: list[float]
     ax.set_ylabel('loss')
     ax.grid(True)
     ax.legend(loc='upper right')
+
+    plt.show()
+
+
+def plot_loss_acc(loss_train: Sequence, loss_valid: Sequence, acc_train: Sequence, acc_valid: Sequence):
+    """
+    plot result of training model progress
+
+    Args:
+        loss_train:
+        loss_valid:
+        acc_train:
+        acc_valid:
+    """
+    assert len(loss_train) == len(loss_valid) == len(acc_train) == len(acc_valid)
+
+    plt.style.use('ggplot')
+
+    names = {0: 'loss', 1: 'acc'}
+    epochs = np.arange(len(loss_train))
+    fig, axes = plt.subplots(1, 2, figsize=(15, 7))
+    fig.tight_layout()
+    fig.subplots_adjust(wspace=.1)
+
+    for i, ((tr, val), ax) in enumerate(zip(((loss_train, loss_valid), (acc_train, acc_valid)), axes)):
+        ax.plot(epochs, tr, label='train')
+        ax.plot(epochs, val, label='valid')
+        ax.set_xlabel('epoch')
+        ax.set_ylabel(names[i])
+        ax.set_title(names[i])
+        ax.grid(True)
+        ax.legend(loc='upper right')
 
     plt.show()

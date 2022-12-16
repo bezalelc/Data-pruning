@@ -7,8 +7,16 @@ import torchvision
 from torch import nn, optim, Tensor
 from torchvision import models
 
+# class Loader(torch.utils.data.DataLoader):
+#     def __init__(self, dataset, idx, batch_size: int, shuffle: bool = True):
+#         super(Loader, self).__init(torch.utils.data.Subset(dataset, idx), batch_size=batch_size, shuffle=shuffle,
+#                                    num_workers=4)
+#         self.data = self.data.cuda()
+from torch.utils.data.dataloader import default_collate
 
-def get_loader(dataset, idx, batch_size: int, shuffle: bool = True) -> torch.utils.data.DataLoader:
+
+def get_loader(dataset: torchvision.datasets, idx, batch_size: int,
+               shuffle: bool = True) -> torch.utils.data.DataLoader:
     """
     get data loader according to indexes
 
@@ -22,29 +30,32 @@ def get_loader(dataset, idx, batch_size: int, shuffle: bool = True) -> torch.uti
 
     """
     subset = torch.utils.data.Subset(dataset, idx)
-    return torch.utils.data.DataLoader(subset, batch_size=batch_size, shuffle=shuffle)
+    # loader = torch.utils.data.DataLoader(subset, batch_size=batch_size, shuffle=shuffle, num_workers=4,
+    #                                      collate_fn=lambda x: tuple(torch.tensor(x_).cuda() for x_ in default_collate(x)))
+    loader = torch.utils.data.DataLoader(subset, batch_size=batch_size, shuffle=shuffle, num_workers=1, pin_memory=True)
+    return loader
 
 
 def get_model_resnet18_cifar10() -> tuple[
     torchvision.models.resnet.ResNet,
     torch.nn.modules.loss.CrossEntropyLoss,
-    torch.optim.SGD,
+    torch.optim.Adam,
     torch.optim.lr_scheduler.StepLR
 ]:
     """
+    Returns: model, criterion, optimizer, scheduler
 
-    Returns:
     """
-    model = models.resnet18(weights=None)  # ,pretrained=False
+    model = models.resnet18(weights=None)
     model.fc = nn.Linear(model.fc.in_features, 10)
-    # model.to(DEVICE)
-    # model.load_state_dict(torch.load('ResNet18.pt'))
-
+    optimizer = optim.Adam(model.parameters(), lr=1e-2)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=1e-4, momentum=0.9, weight_decay=5e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1, verbose=True)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
 
     return model, criterion, optimizer, scheduler
+
+
+# print(len(get_model_resnet18_cifar10()[0].state_dict()))
 
 
 def create_saved_data_dir(file: str) -> Callable[[str], str]:
