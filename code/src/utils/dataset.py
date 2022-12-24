@@ -10,30 +10,42 @@ import torchvision
 from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision import transforms
+from ..config import PATH_DATASETS
+
+CIFAR100_TRAIN_MEAN = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
+CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
 
 
 def get_cifar(path_dataset: str, cifar100: bool = True) -> \
-        tuple[torchvision.datasets.CIFAR10, torchvision.datasets.CIFAR10]:
+        tuple[torchvision.datasets.CIFAR10, torchvision.datasets.CIFAR10, torchvision.datasets.CIFAR10, torchvision.datasets.CIFAR10]:
     """
     get cifar10 train set and test set
 
     Returns:
         cifar10 train set and test set
     """
-    #  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     if cifar100:
-        transform = transforms.Compose([
-            # transforms.Pad(4),
-            # transforms.RandomHorizontalFlip(),
-            # transforms.RandomCrop(32),
+        transform_train = transforms.Compose([
+            # transforms.RandomAdjustSharpness(sharpness_factor=2),
+            # transforms.ColorJitter(brightness=.6, hue=.04),  # +
+            transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(15),
             transforms.ToTensor(),
-            # transforms.Normalize((0.50707516, 0.48654887, 0.44091784), (0.26733429, 0.25643846, 0.27615047))
-            transforms.Normalize((.5, .5, .5), (.5, .5, .5))
+            transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD)
         ])
-        # [0.50707516 0.48654887 0.44091784] [0.26733429 0.25643846 0.27615047]
-        # [0.50736203 0.48668956 0.44108857] [0.26748815 0.2565931  0.27630851] with train
-        dataset_train = torchvision.datasets.CIFAR100(path_dataset, train=True, transform=transform, download=True)
-        dataset_test = torchvision.datasets.CIFAR100(path_dataset, train=False, transform=transform, download=True)
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD)
+        ])
+        dataset_train = torchvision.datasets.CIFAR100(PATH_DATASETS, train=True, transform=transform_train,
+                                                      download=True)
+        dataset_test = torchvision.datasets.CIFAR100(PATH_DATASETS, train=False, transform=transform_test,
+                                                     download=True)
+
+        dataset_train_ordered = torchvision.datasets.CIFAR100(path_dataset, train=True, download=False,
+                                                              transform=transform_test)
+        dataset_train_raw = torchvision.datasets.CIFAR100(path_dataset, train=True, download=False)
     else:
         transform = transforms.Compose([
             # transforms.Pad(4),
@@ -47,13 +59,17 @@ def get_cifar(path_dataset: str, cifar100: bool = True) -> \
         dataset_train = torchvision.datasets.CIFAR10(path_dataset, train=True, transform=transform, download=True)
         dataset_test = torchvision.datasets.CIFAR10(path_dataset, train=False, transform=transform, download=True)
 
-    return dataset_train, dataset_test
+        dataset_train_ordered = torchvision.datasets.CIFAR10(path_dataset, train=True, download=False,
+                                                              transform=transform)
+        dataset_train_raw = torchvision.datasets.CIFAR10(path_dataset, train=True, download=False)
+
+    return dataset_train, dataset_test, dataset_train_ordered, dataset_train_raw
 
 
 class GPUDataset(Dataset):
-    PATH_DATASETS: str = os.path.abspath(os.path.join('../../../', 'datasets'))
+    # PATH_DATASETS: str = os.path.abspath(os.path.join('../../../', 'datasets'))
     PATH_TRANSFORMED: str = os.path.abspath(os.path.join(PATH_DATASETS, 'gpu', 'cifar{}_transformed.pt'))
-    NORM_100 = ((0.50707516, 0.48654887, 0.44091784), (0.26733429, 0.25643846, 0.27615047))
+    # NORM_100 = ((0.50707516, 0.48654887, 0.44091784), (0.26733429, 0.25643846, 0.27615047))
     NORM_10 = ((0.49139968, 0.48215841, 0.44653091), (0.24703223, 0.24348513, 0.26158784))
     NORM_05 = ((.5, .5, .5), (.5, .5, .5))
 
@@ -65,23 +81,23 @@ class GPUDataset(Dataset):
                 self.PATH_TRANSFORMED.format('100' if cifar100 else '10').format('100' if cifar100 else '10'))
             self.data, self.targets, self.classes = dataset['x'], dataset['y'], dataset['classes']
         else:
-            transform = transforms.Compose([
-                # transforms.Pad(4),
-                # transforms.RandomHorizontalFlip(),
-                # transforms.RandomCrop(32),
-                transforms.ToTensor(),
-                transforms.Normalize((.5, .5, .5), (.5, .5, .5))
-                # transforms.Normalize(*self.NORM_05)
-            ])
             if cifar100:
-                dataset_train = torchvision.datasets.CIFAR100(self.PATH_DATASETS, train=True, transform=transform,
+                transform = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD)
+                ])
+                dataset_train = torchvision.datasets.CIFAR100(PATH_DATASETS, train=True, transform=transform,
                                                               download=True)
-                dataset_test = torchvision.datasets.CIFAR100(self.PATH_DATASETS, train=False, transform=transform,
+                dataset_test = torchvision.datasets.CIFAR100(PATH_DATASETS, train=False, transform=transform,
                                                              download=True)
             else:
-                dataset_train = torchvision.datasets.CIFAR10(self.PATH_DATASETS, train=True, transform=transform,
+                transform = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(*self.NORM_10)
+                ])
+                dataset_train = torchvision.datasets.CIFAR10(PATH_DATASETS, train=True, transform=transform,
                                                              download=True)
-                dataset_test = torchvision.datasets.CIFAR10(self.PATH_DATASETS, train=False, transform=transform,
+                dataset_test = torchvision.datasets.CIFAR10(PATH_DATASETS, train=False, transform=transform,
                                                             download=True)
             self.data: Tensor = torch.cat(
                 (torch.stack([dataset_train[i][0] for i in range(len(dataset_train))], dim=0),

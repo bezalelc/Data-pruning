@@ -1,7 +1,11 @@
+from typing import Sequence
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from typing import Sequence,Union
+from typing import Sequence
+
+from torch import Tensor
 
 
 def plot_prune_example(images_loader: torch.utils.data.DataLoader,
@@ -38,6 +42,54 @@ def plot_prune_example(images_loader: torch.utils.data.DataLoader,
                      f"Class: {images_loader.classes[images_loader[i][1]]}")
         # ax.set_facecolor('xkcd:salmon')
     plt.show()
+
+
+def plot_img_and_top(dataset: torch.utils.data.DataLoader, range_: tuple, scores: Tensor,
+                     softmax: Tensor, ensemble: bool = False, score_name: str = ''):
+    num_train = len(scores)
+    num_plots, num_top = 5, 12
+    classes = dataset.classes
+    idx = np.random.randint(int(num_train * range_[0]), int(num_train * range_[1]), num_plots)
+    # print(int(num_train * range_[0]), int(num_train * range_[1]))
+    # print(idx)
+    idx = scores.sort()[1].numpy()[idx]
+
+    if ensemble:
+        softmax = softmax.mean(dim=0)
+
+    plt.style.use('default')
+    fig, axes = plt.subplots(2, 5, figsize=(18, 8))
+
+    for i, ax_txt, ax_img in zip(idx, axes[0], axes[1]):
+        s = f'{score_name} score: {scores[i]:.3f}\nTrue class: {classes[dataset[i][1]]}'  # score: {scores[i]}\n
+        top_scores, top_classes_idx = softmax[i].sort(descending=True)
+        for score, j in zip(top_scores[:num_top], top_classes_idx[:num_top]):
+            s += f"\n{(classes[j] + ':'):<15} {score:.0%}"
+
+        ax_txt.text(.0, .0, s, dict(size=14, family='monospace'))
+        ax_txt.axis('off')
+        ax_img.imshow(dataset[i][0])
+
+    plt.show()
+
+
+def main():
+    from code.src.config import PATH_SAVE_MODELS, PATH_DATASETS
+    import torchvision
+    import os
+
+    ENSAMBLE_SAVED_DATA = os.path.join(PATH_SAVE_MODELS, 'el2n', 'general.pt')
+    data = torch.load(ENSAMBLE_SAVED_DATA)
+    scores = data['el2n_scores']
+    ensemble_softmax = data['ensemble_softmax']
+
+    data_train_raw = torchvision.datasets.CIFAR100(PATH_DATASETS, train=True)
+    plot_img_and_top(data_train_raw, (.1, .99), scores, ensemble_softmax, ensemble=True, score_name='EL2N')
+    # plot_prune_example(data_train_raw, change_counter, hardest=True, random=False, prune_method_name='Forgetting')
+
+
+if __name__ == '__main__':
+    main()
 
 
 def compare_models_losses(loss_train: list[float], loss_train_prune: list[float], loss_valid: list[float],

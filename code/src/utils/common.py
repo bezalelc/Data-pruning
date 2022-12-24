@@ -30,9 +30,10 @@ def get_loader(dataset: torchvision.datasets, idx, batch_size: int,
 
     """
     subset = torch.utils.data.Subset(dataset, idx)
-    # loader = torch.utils.data.DataLoader(subset, batch_size=batch_size, shuffle=shuffle, num_workers=4,
-    #                                      collate_fn=lambda x: tuple(torch.tensor(x_).cuda() for x_ in default_collate(x)))
-    loader = torch.utils.data.DataLoader(subset, batch_size=batch_size, shuffle=shuffle, num_workers=1, pin_memory=True)
+    loader = torch.utils.data.DataLoader(subset, batch_size=batch_size, shuffle=shuffle, num_workers=4,
+                                         prefetch_factor=4,
+                                         pin_memory=True, persistent_workers=True)
+
     return loader
 
 
