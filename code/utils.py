@@ -55,6 +55,44 @@ def get_cifar100() -> \
     return dataset_train, dataset_test, dataset_train_for_test, dataset_train_raw
 
 
+CIFAR10_TRAIN_MEAN = (0.5, 0.5, 0.5)
+CIFAR10_TRAIN_STD = (0.5, 0.5, 0.5)
+
+
+def get_cifar10() -> \
+        tuple[
+            torchvision.datasets.CIFAR10,
+            torchvision.datasets.CIFAR10,
+            torchvision.datasets.CIFAR10,
+            torchvision.datasets.CIFAR10
+        ]:
+    """
+    get cifar100 train set and test set
+    """
+    transform_train = transforms.Compose([
+        # transforms.RandomAdjustSharpness(sharpness_factor=2),
+        # transforms.ColorJitter(brightness=.6, hue=.04),  # +
+        transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(15),
+        transforms.ToTensor(),
+        transforms.Normalize(CIFAR10_TRAIN_MEAN, CIFAR10_TRAIN_STD)
+    ])
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(CIFAR10_TRAIN_MEAN, CIFAR10_TRAIN_STD)
+    ])
+    dataset_train = torchvision.datasets.CIFAR10(PATH_DATASETS, train=True, transform=transform_train,
+                                                 download=True)
+    dataset_test = torchvision.datasets.CIFAR10(PATH_DATASETS, train=False, transform=transform_test,
+                                                download=True)
+    dataset_train_for_test = torchvision.datasets.CIFAR10(PATH_DATASETS, train=True, download=False,
+                                                          transform=transform_test)
+    dataset_train_raw = torchvision.datasets.CIFAR10(PATH_DATASETS, train=True, download=False)
+
+    return dataset_train, dataset_test, dataset_train_for_test, dataset_train_raw
+
+
 def get_loader(dataset: torchvision.datasets, idx, batch_size: int,
                shuffle: bool = True) -> torch.utils.data.DataLoader:
     """
@@ -79,7 +117,7 @@ def get_loader(dataset: torchvision.datasets, idx, batch_size: int,
 def plot_img_and_top(dataset: torch.utils.data.DataLoader, range_: tuple, scores: Tensor,
                      softmax: Tensor, ensemble: bool = False, score_name: str = ''):
     num_train = len(scores)
-    num_plots, num_top = 5, 12
+    num_plots, num_top = 5, 10
     classes = dataset.classes
     idx = np.random.randint(int(num_train * range_[0]), int(num_train * range_[1]), num_plots)
     idx = scores.sort()[1].numpy()[idx]
@@ -88,7 +126,7 @@ def plot_img_and_top(dataset: torch.utils.data.DataLoader, range_: tuple, scores
         softmax = softmax.mean(dim=0)
 
     plt.style.use('default')
-    fig, axes = plt.subplots(2, 5, figsize=(18, 8))
+    fig, axes = plt.subplots(2, 5, figsize=(18, 4))
 
     for i, ax_txt, ax_img in zip(idx, axes[0], axes[1]):
         s = f'{score_name} score: {scores[i]:.3f}\nTrue class: {classes[dataset[i][1]]}'  # score: {scores[i]}\n

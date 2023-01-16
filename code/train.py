@@ -1,4 +1,6 @@
 import os.path
+# ===========================================
+import os.path
 import shutil
 import sys
 from enum import Enum
@@ -6,11 +8,96 @@ from typing import Sequence
 
 import numpy as np
 import torch
-from torch import nn, optim
-from torch.nn import Module, Conv2d, Linear, BatchNorm2d, ReLU, Sequential, AdaptiveAvgPool2d
+import torchvision
+from torch import nn
+from torch import optim
+from torch.nn import Conv2d, BatchNorm2d, ReLU, Sequential, AdaptiveAvgPool2d, Linear, Module
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+
+# class ResBlock_(nn.Module):
+#     def __init__(self, in_channels, out_channels, downsample, stride=1):
+#         super().__init__()
+#         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
+#         if downsample:
+#             self.shortcut = nn.Sequential(
+#                 nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
+#                 nn.BatchNorm2d(out_channels)
+#             )
+#         else:
+#             self.shortcut = nn.Sequential()
+#
+#         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
+#         self.bn1 = nn.BatchNorm2d(out_channels)
+#         self.bn2 = nn.BatchNorm2d(out_channels)
+#
+#     def forward(self, input):
+#         # print('input', input.shape)
+#         shortcut = self.shortcut(input)
+#         # print('shortcut', shortcut.shape)
+#         input = nn.ReLU()(self.bn1(self.conv1(input)))
+#         # print('conv1', input.shape)
+#         input = nn.ReLU()(self.bn2(self.conv2(input)))
+#         # print('conv2', input.shape)
+#         input = input + shortcut
+#         return nn.ReLU()(input)
+#
+#
+# class ResNet18_(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.layer0 = nn.Sequential(
+#             nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
+#             # nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+#             nn.BatchNorm2d(64),
+#             nn.ReLU()
+#         )
+#
+#         self.layer1 = nn.Sequential(
+#             ResBlock_(64, 64, downsample=False),
+#             ResBlock_(64, 64, downsample=False)
+#         )
+#
+#         self.layer2 = nn.Sequential(
+#             ResBlock_(64, 128, downsample=True),
+#             ResBlock_(128, 128, downsample=False)
+#         )
+#
+#         self.layer3 = nn.Sequential(
+#             ResBlock_(128, 256, downsample=True),
+#             ResBlock_(256, 256, downsample=False)
+#         )
+#
+#         self.layer4 = nn.Sequential(
+#             ResBlock_(256, 512, downsample=True, stride=2),
+#             ResBlock_(512, 512, downsample=False)
+#         )
+#
+#         self.avg_pool = torch.nn.AdaptiveAvgPool2d(1)
+#         self.flatten = nn.Flatten()
+#         self.fc = torch.nn.Linear(512, 100)
+#
+#     def forward(self, input):
+#         input = self.layer0(input)
+#         input = self.layer1(input)
+#         # print('\n2')
+#         input = self.layer2(input)
+#         # print('3')
+#         input = self.layer3(input)
+#         # print('4')
+#         input = self.layer4(input)
+#         # print('avg_pool')
+#         input = self.avg_pool(input)
+#         # print('flatten', input.shape)
+#         input = self.flatten(input)  # torch.flatten(input)
+#         # print('fc', input.shape)
+#         input = self.fc(input)
+#         # print('end')
+#         return input
+#
+
+# ===============================
 
 class Mode(Enum):
     TRAIN = 0
@@ -56,8 +143,9 @@ class ResNet18(Module):
         self.layer4 = Sequential(BasicBlock(in_=256, out=512, kernel_size=(3, 3), stride=(2, 2)),
                                  BasicBlock(in_=512, out=512, kernel_size=(3, 3), stride=(1, 1)))
         self.avgpool = AdaptiveAvgPool2d(output_size=(1, 1))
-        self.fc = nn.Sequential(Linear(in_features=512, out_features=200, bias=True),
-                                Linear(200, num_classes, bias=True))
+        self.fc = Linear(512, num_classes, bias=True)
+        # self.fc = nn.Sequential(Linear(in_features=512, out_features=200, bias=True),
+        #                         Linear(200, num_classes, bias=True))
 
     def forward(self, x):
         out = self.conv1(x)
@@ -88,15 +176,54 @@ class ModelManager:
         self.dir = dir_
         self.num_classes: int = num_classes
 
-        self.model: Module = ResNet18(100)
-        self.criterion: torch.nn.modules.loss.CrossEntropyLoss = nn.CrossEntropyLoss()
-        self.model.to(self.DEVICE)
-        # self.optimizer: torch.optim.SGD = optim.SGD(self.model.parameters(), lr=1e-3, momentum=.9)  # lr=1e-1
-        self.optimizer: torch.optim.Adam = optim.Adam(self.model.parameters(), lr=1e-3, weight_decay=.5e-4)  # lr=1e-4
-        self.scheduler: torch.optim.lr_scheduler.MultiStepLR = \
-            optim.lr_scheduler.MultiStepLR(self.optimizer,
-                                           milestones=[50, 65, 70, 75, 80, 85, 90, 95], gamma=0.3)
-        # optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
+        # cifar100:
+        # self.model: Module = ResNet18(self.num_classes)
+        # self.optimizer: torch.optim.SGD = optim.SGD(self.model.parameters(), lr=1e-2, momentum=.9)  # lr=1e-1
+        # self.scheduler: torch.optim.lr_scheduler.MultiStepLR = \
+        #     optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[40, 45, 50], gamma=0.3)
+        # cifar10:
+        #         self.model = torchvision.models.resnet18(weights=None)
+        #         self.model.conv1 = Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        #         self.model.maxpool = nn.Identity()
+        #         self.model.fc = Linear(512, self.num_classes, bias=True)
+        #         self.optimizer: torch.optim.Adam = optim.Adam(self.model.parameters(), lr=1e-3)
+        #         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5,
+        #         patience=2,threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=1e-7, eps=1e-08, verbose=True)
+
+        # self.model: Module = ResNet9(3, 100)
+        # self.model: Module = ResNet18(self.num_classes)
+        # self.model = ResNet18_()
+        if num_classes == 10:
+            self.model = torchvision.models.resnet18(weights=None)
+            self.model.conv1 = Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+            self.model.maxpool = nn.Identity()
+            self.model.fc = Linear(512, self.num_classes, bias=True)
+            # self.model.fc = Sequential(Linear(512, 128, bias=True), Linear(128, self.num_classes, bias=True))
+            self.criterion: torch.nn.modules.loss.CrossEntropyLoss = nn.CrossEntropyLoss()
+            self.model.to(self.DEVICE)
+            # self.optimizer: torch.optim.SGD = optim.SGD(self.model.parameters(), lr=1e-2, momentum=.9)  # lr=1e-1
+            self.optimizer: torch.optim.Adam = optim.Adam(self.model.parameters(), lr=1e-3)
+            # self.scheduler: torch.optim.lr_scheduler.MultiStepLR = \
+            # self.scheduler: torch.optim.lr_scheduler.MultiStepLR = \
+            # optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[5], gamma=0.5)
+            # self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=100, gamma=0.1)
+            self.scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau = \
+                torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5,
+                                                           patience=2,
+                                                           threshold=0.0001, threshold_mode='rel',
+                                                           cooldown=0,
+                                                           min_lr=1e-7, eps=1e-08, verbose=True)
+            # self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer, 1e-4, epochs=100, steps_per_epoch=100)
+        elif num_classes == 100:
+            self.model: Module = ResNet18(self.num_classes)
+            self.optimizer: torch.optim.SGD = optim.SGD(self.model.parameters(), lr=1e-3, momentum=.9)  # lr=1e-1
+            self.scheduler: torch.optim.lr_scheduler.MultiStepLR = \
+                optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[40, 45, 50], gamma=0.3, verbose=True)
+            self.criterion: torch.nn.modules.loss.CrossEntropyLoss = nn.CrossEntropyLoss()
+            self.model.to(self.DEVICE)
+
+        else:
+            raise Exception('')
 
         if load:
             self.load_model()
@@ -143,8 +270,11 @@ class ModelManager:
             X, y = X.to(device), y.to(device)
 
             if mode == Mode.TRAIN:
-                optimizer.zero_grad()
+                #  perfornace optimization:
+                #  https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
+                optimizer.zero_grad(set_to_none=True)
 
+            #  performance optimization:
             with torch.cuda.amp.autocast():
                 p = model(X)
                 loss_batch = criterion(p, y)
@@ -164,11 +294,14 @@ class ModelManager:
                 pred[batch_idx * loader.batch_size:(batch_idx + 1) * loader.batch_size] = pred_
 
             progress.update(1)
+            # self.scheduler.step()
             progress.set_postfix(loss=f'{loss:.2}', acc=f'{acc:.2%}')
 
         progress.close()
-        if mode == Mode.TRAIN:
+        if isinstance(self.scheduler, torch.optim.lr_scheduler.MultiStepLR) and mode == Mode.TRAIN:
             scheduler.step()
+        elif isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau) and mode == Mode.VALIDATE:
+            scheduler.step(loss)
 
         return scores, pred, loss, acc
 
@@ -179,6 +312,9 @@ class ModelManager:
 
         # general configurations
         self.model.to(self.DEVICE)
+
+        # performance optimization:
+        # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-cudnn-auto-tuner
         benchmark = torch.backends.cudnn.benchmark
         torch.backends.cudnn.benchmark = True
 
@@ -218,6 +354,7 @@ class ModelManager:
 
         # restore
         self.model.cpu()
+        # perfornace optimization: return value to default
         torch.backends.cudnn.benchmark = benchmark
 
         self._save_progress(loss_train, acc_train, loss_valid, acc_valid, scores_test, pred_test, loss_test, acc_test)
@@ -290,6 +427,9 @@ class ModelManager:
                                           **{f'{k} valid': v['valid']['acc'][i] for k, v in data_models.items()}}, i)
         tb.close()
 
+    # def copy_log(self, other):
+    #     import shutil
+    #     shutil.copy(other.path_log, self.path_log)
     # @staticmethod
     # def ensemble_predict(ensemble: Sequence, loader):
     #     ensemble_scores = [model.run_epoch(loader, Mode.TEST)[0] for model in ensemble]
@@ -297,7 +437,30 @@ class ModelManager:
 
 # tests
 def main():
-    pass
+    # globals
+    NUM_CLASSES = 100
+    BATCH_SIZE = 25
+    NUM_TRAIN = 50000
+    NUM_TEST = 10000
+    EPOCHS = 75
+
+    NOTEBOOK_NAME = 'resnet18_cifar100'
+    print('train on:', ModelManager.DEVICE)
+
+    # train_idx = np.arange(NUM_TRAIN, dtype=int)
+    # test_idx = np.arange(NUM_TEST, dtype=int)
+    # dataset_train, dataset_test, dataset_train_for_test, dataset_train_raw = get_cifar100()
+    # loader_train = get_loader(dataset_train, train_idx, BATCH_SIZE, shuffle=True)
+    # loader_test = get_loader(dataset_test, test_idx, BATCH_SIZE, shuffle=False)
+    # loader_train_ordered = get_loader(dataset_train_for_test, train_idx, BATCH_SIZE, shuffle=False)
+    # Y_train = Tensor(dataset_train.targets)[train_idx].type(torch.int64)
+    # Y_test = Tensor(dataset_test.targets)[test_idx].type(torch.int64)
+    # # optim,sched,jitter,resnet9,extra fc
+    model = ModelManager(100, load=False)
+    print(isinstance(model.scheduler, torch.optim.lr_scheduler.MultiStepLR))
+    print(isinstance(model.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau))
+    # print(model.model)
+    # model.train(loader_train, loader_test, loader_test, EPOCHS)
 
 
 if __name__ == '__main__':
