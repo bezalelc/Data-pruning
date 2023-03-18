@@ -426,7 +426,8 @@ class ModelManager:
             tb.add_scalars('models acc', {**{f'{k} train': v['train']['acc'][i] for k, v in data_models.items()},
                                           **{f'{k} valid': v['valid']['acc'][i] for k, v in data_models.items()}}, i)
         tb.close()
-
+    def f(self):
+        pass
     # def copy_log(self, other):
     #     import shutil
     #     shutil.copy(other.path_log, self.path_log)
@@ -457,8 +458,9 @@ def main():
     # Y_test = Tensor(dataset_test.targets)[test_idx].type(torch.int64)
     # # optim,sched,jitter,resnet9,extra fc
     model = ModelManager(100, load=False)
-    print(isinstance(model.scheduler, torch.optim.lr_scheduler.MultiStepLR))
-    print(isinstance(model.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau))
+    print(model.model)
+    # print(isinstance(model.scheduler, torch.optim.lr_scheduler.MultiStepLR))
+    # print(isinstance(model.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau))
     # print(model.model)
     # model.train(loader_train, loader_test, loader_test, EPOCHS)
 

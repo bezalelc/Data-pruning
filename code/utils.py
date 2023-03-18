@@ -3,6 +3,8 @@ helpers for common datasets operations
 """
 
 import os
+import shutil
+from typing import Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -139,6 +141,27 @@ def plot_img_and_top(dataset: torch.utils.data.DataLoader, range_: tuple, scores
         ax_img.imshow(dataset[i][0])
 
     plt.show()
+
+
+def convert_bin_dataset_to_images_dataset(dataset: torchvision.datasets, name: str,
+                                          dir_: Literal['train', 'valid', 'test']):
+    path_to_dataset = os.path.join(PATH_DATASETS, name, dir_)
+    if os.path.exists(path_to_dataset):
+        shutil.rmtree(path_to_dataset)
+    os.makedirs(path_to_dataset)
+    path_classes = [os.path.join(path_to_dataset, class_) for class_ in dataset.classes]
+    for path_class in path_classes:
+        os.makedirs(path_class)
+
+    for i, (img, label) in enumerate(dataset):
+        img.save(os.path.join(path_classes[label], f'{i}.png'))
+
+
+if __name__ == '__main__':
+    dataset_train = torchvision.datasets.CIFAR10(PATH_DATASETS, train=True)
+    dataset_test = torchvision.datasets.CIFAR10(PATH_DATASETS, train=False)
+    # convert_bin_dataset_to_images_dataset(dataset_train, 'cifar10images', 'train')
+    convert_bin_dataset_to_images_dataset(dataset_test, 'cifar10images', 'test')
 
 # def get_el2n_scores(y: Tensor, ensemble_pred: Tensor):
 #     """

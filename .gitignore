@@ -6,8 +6,10 @@
 datasets/*
 models_data/*
 tensorboard_log/*
+fig/*
 *.pt
 *.pkl
+*.npy
 
 # project 
 articles/
@@ -17,12 +19,8 @@ progress
 backup/
 
 # temp
+code/temp*
 temp/
-code/tmp.ipynb
-code/t.py
-code/src/research/temp.ipynb
-code/src/research/PyTorch_CIFAR10_TB.ipynb
-code/augmantion.ipynb
 
 # python temp
 code/main.py
