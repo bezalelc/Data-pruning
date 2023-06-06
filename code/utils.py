@@ -1,5 +1,5 @@
 """
-helpers for common datasets operations
+helpers for common datasets operations for cifar10/100 dataset
 """
 
 import os
@@ -13,8 +13,6 @@ import torchvision
 from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision import transforms
-
-# from torch.utils.data.dataloader import default_collate
 
 PATH_ROOT = os.path.abspath(os.path.join(os.path.split(__file__)[0], '../'))
 PATH_DATASETS = os.path.join(PATH_ROOT, 'datasets')

@@ -1,3 +1,6 @@
+# run SWAV model on cifar10/100 dataset and extract features for the km metric
+
+
 import os
 import time
 import warnings
@@ -28,9 +31,12 @@ logs_root_dir = os.path.join(os.getcwd(), "benchmark_logs")
 # set max_epochs to 800 for long run (takes around 10h on a single V100)
 max_epochs = 200
 num_workers = 4
-knn_k = 20 # 200
+
+# in cifar10 we have 5000 train image per class so knn_k=200
+# in cifar 100 because we have only 500 image per class knn_k=20
+knn_k = 200
 knn_t = 0.1
-FEATURES = 512  # 512
+FEATURES = 512
 NUM_CLASSES = 100
 NUM_TRAIN = 50000
 classes = NUM_CLASSES
