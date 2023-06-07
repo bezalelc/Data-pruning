@@ -35,8 +35,7 @@ EL2N and pred sum metrics it is possible to find the "noisy" examples and remove
 them from the data.
 
 # Files
- - code
-   Includes all the code of the project's experiments in the notebooks, in each notebook it is indicated at the beginning which experiments it includes.  In addition, there are several shared code files between the notebooks:
+The folder "code" includes all the code of the project's experiments in the notebooks, in each notebook it is indicated at the beginning which experiments it includes. In addition, there are several shared code files between the notebooks:
  - train.py
  - utils.py 
  - train_vegetable_dataset.py
